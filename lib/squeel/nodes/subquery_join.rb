@@ -1,7 +1,7 @@
 module Squeel
   module Nodes
     class SubqueryJoin < Node
-      attr_accessor :subquery, :type, :constraints
+      attr_accessor :subquery, :type, :constraints, :binds
 
       def initialize(subquery, constraints, type = Squeel::InnerJoin)
         raise ArgumentError,
@@ -13,6 +13,7 @@ module Squeel
         self.subquery = subquery
         self.constraints = constraints
         self.type = type
+        self.binds = subquery.left.bind_values
       end
 
       # Implemented for equality testing

@@ -7,8 +7,9 @@ module Squeel
 
         undef_method 'to_sql_with_binding_params'
 
-        attr_accessor :reverse_order_value
+        attr_accessor :reverse_order_value, :_hacky_bind_values
         private :reverse_order_value, :reverse_order_value=
+        private :_hacky_bind_values, :_hacky_bind_values=
 
         # We are using 4.1 version of reverse_order!
         # Because 4.2 reverse the order immediately before build_order
@@ -63,9 +64,7 @@ module Squeel
           stashed_association_joins = buckets[:stashed_join] || []
           join_nodes                = (buckets[:join_node] || []).uniq
           subquery_joins            = buckets[:subquery_join] || []
-          string_joins              = (buckets[:string_join] || []).map { |x|
-            x.strip
-          }.uniq
+          string_joins              = (buckets[:string_join] || []).map(&:strip).uniq
 
           join_list = join_nodes + custom_join_ast(manager, string_joins)
 
@@ -122,6 +121,20 @@ module Squeel
           end
 
           attributes
+        end
+
+        private
+        def build_join_from_subquery(subquery_joins)
+          join = subquery_joins.map do |join|
+            self.bind_values += join.binds unless _hacky_bind_values # FIXME: join.subquery.left.arel will call build_arel AGAIN forcing re-bind of bind_values. Hacky way of preventing that
+            join.type.new(
+              Arel::Nodes::TableAlias.new(
+                Arel::Nodes::Grouping.new(join.subquery.left.arel.ast), join.subquery.right),
+              Arel::Nodes::On.new(where_visit(join.constraints))
+            )
+          end
+          self._hacky_bind_values = true
+          join
         end
       end
     end

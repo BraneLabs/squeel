@@ -648,6 +648,19 @@ module Squeel
             people.should eq([Person.first, Person.last])
           end
 
+          it 'allows subqueries with polymorphic relations' do
+            notes_relation_1 = Person.first.notes
+            notes_relation_2 = Person.last.notes
+            klazz_name = "Person"
+            relation = Person.joins { [
+              notes_relation_1.as("notes_1").on { (~id == notes_1.notable_id) & (notes_1.notable_type == klazz_name) }.outer,
+              notes_relation_2.as("notes_2").on { (~id == notes_2.notable_id) & (notes_2.notable_type == klazz_name) }.outer
+            ] }.where { notes_1.note != nil }
+
+            relation.to_sql.should eq("SELECT \"people\".* FROM \"people\" LEFT OUTER JOIN (SELECT \"notes\".* FROM \"notes\" WHERE \"notes\".\"notable_id\" = 1 AND \"notes\".\"notable_type\" = 'Person') notes_1 ON (\"people\".\"id\" = \"notes_1\".\"notable_id\" AND \"notes_1\".\"notable_type\" = 'Person') LEFT OUTER JOIN (SELECT \"notes\".* FROM \"notes\" WHERE \"notes\".\"notable_id\" = 10 AND \"notes\".\"notable_type\" = 'Person') notes_2 ON (\"people\".\"id\" = \"notes_2\".\"notable_id\" AND \"notes_2\".\"notable_type\" = 'Person') WHERE \"notes_1\".\"note\" IS NOT NULL")
+            relation.should have(1).people
+          end
+
           it 'is backwards-compatible with "where.not"' do
             if activerecord_version_at_least '4.0.0'
               name = Person.first.name
